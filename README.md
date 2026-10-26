@@ -18,7 +18,7 @@ A lightweight, browser-based JSON viewer and formatter implemented as a single H
 
 ## Screenshot
 
-Add a screenshot here once published.
+Open in browser https://yourusername.github.io/json-viewer/
 
 ## Usage
 
