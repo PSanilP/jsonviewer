@@ -18,7 +18,7 @@ A lightweight, browser-based JSON viewer and formatter implemented as a single H
 
 ## Screenshot
 
-Open in browser https://yourusername.github.io/json-viewer/
+Open in browser https://psanilp.github.io/jsonviewer/
 
 ## Usage
 
@@ -41,7 +41,7 @@ The application can also be hosted using GitHub Pages.
 Example URL:
 
 ```text
-https://yourusername.github.io/json-viewer/
+https://psanilp.github.io/jsonviewer/
 ```
 
 ## Working with JSON
@@ -94,31 +94,6 @@ All processing occurs entirely within the browser.
 
 No data is uploaded, transmitted, or stored remotely.
 
-## Deployment to GitHub Pages
-
-1. Create a public GitHub repository.
-2. Upload `index.html`.
-3. Go to:
-
-```text
-Settings → Pages
-```
-
-4. Select:
-
-```text
-Deploy from a branch
-Branch: main
-Folder: / (root)
-```
-
-5. Save.
-
-GitHub will publish the site at:
-
-```text
-https://psanilp.github.io/jsonviewer/
-```
 
 ## License
 
