@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="favicon.ico" />
+    <title>Online JSON Viewer</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 11px;
+            background: #fff;
+            color: #000;
+        }
+
+        /* ── Tab bar ── */
+        #tab-bar {
+            display: flex;
+            border-bottom: 1px solid #aaa;
+            background: #f0f0f0;
+            padding: 4px 4px 0;
+            gap: 2px;
+        }
+
+        .tab-btn {
+            padding: 3px 10px;
+            border: 1px solid #aaa;
+            border-bottom: none;
+            background: #dcdcdc;
+            cursor: pointer;
+            font-size: 11px;
+            font-family: Arial, Helvetica, sans-serif;
+            border-radius: 3px 3px 0 0;
+            color: #333;
+        }
+
+            .tab-btn.active {
+                background: #fff;
+                border-bottom: 1px solid #fff;
+                margin-bottom: -1px;
+                color: #000;
+                font-weight: normal;
+            }
+
+        /* ── Toolbar ── */
+        #toolbar {
+            display: flex;
+            align-items: center;
+            padding: 5px 8px;
+            border-bottom: 1px solid #ccc;
+            background: #f8f8f8;
+            gap: 0;
+            flex-wrap: wrap;
+        }
+
+        .tool-btn {
+            padding: 2px 6px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 11px;
+            font-family: Arial, Helvetica, sans-serif;
+            color: #000;
+            text-decoration: none;
+        }
+
+            .tool-btn:hover {
+                text-decoration: underline;
+            }
+
+        .tool-sep {
+            color: #aaa;
+            margin: 0 2px;
+            font-size: 11px;
+            user-select: none;
+        }
+
+        /* ── Panels ── */
+        #panel-text, #panel-viewer {
+            display: none;
+            width: 100%;
+            height: calc(100vh - 64px);
+        }
+
+            #panel-text.active, #panel-viewer.active {
+                display: flex;
+                flex-direction: column;
+            }
+
+        /* TEXT panel */
+        #json-input {
+            flex: 1;
+            width: 100%;
+            resize: none;
+            border: none;
+            outline: none;
+            padding: 6px 8px;
+            font-family: Consolas 'Courier New', monospace;
+            color: blue;
+            font-size: 9pt;
+            line-height: 1.1;
+            color: #000;
+            background: #fff;
+            white-space: pre;
+            /*color:#004d98;*/
+            white-space: pre-wrap; /* preserves formatting but allows wrapping */
+            overflow-wrap: break-word; /* breaks long words */
+            word-break: break-word; /* extra insurance */
+        }
+
+        /* VIEWER panel */
+        #viewer-container {
+            flex: 1;
+            overflow: auto;
+            padding: 6px 10px;
+            background: #fff;
+        }
+
+        /* Error bar */
+        #error-bar {
+            display: none;
+            padding: 5px 10px;
+            background: #ffeaea;
+            color: #c00;
+            border-bottom: 1px solid #f5c6c6;
+            font-size: 12px;
+        }
+
+        /* ── Tree styles ── */
+        .tree-node {
+            font-family: Consolas, 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.2;
+        }
+
+        .tree-item {
+            display: flex;
+            align-items: flex-start;
+            position: relative;
+        }
+
+        .toggle-btn {
+            cursor: pointer;
+            user-select: none;
+            color: #555;
+            min-width: 14px;
+            display: inline-block;
+            font-size: 11px;
+            padding-top: 1px;
+        }
+
+            .toggle-btn:hover {
+                color: #000;
+            }
+
+        .key {
+            color: #000;
+        }
+
+        .colon {
+            color: #555;
+            margin: 0 3px 0 0;
+        }
+
+        .val-string {
+            color: #c00;
+        }
+
+        .val-number {
+            color: #00c;
+        }
+
+        .val-bool {
+            color: #080;
+        }
+
+        .val-null {
+            color: #888;
+        }
+
+        .brace {
+            color: #000;
+        }
+
+        .tree-children {
+            padding-left: 20px;
+            border-left: 1px dotted #ccc;
+            margin-left: 6px;
+        }
+
+        .collapsed > .tree-children {
+            display: none;
+        }
+
+        .inline-preview {
+            color: #888;
+            font-style: normal;
+            margin-left: 4px;
+            font-size: 11px;
+        }
+
+        /* Tooltip on hover for long strings */
+        .val-string[title] {
+            cursor: default;
+        }
+    </style>
+</head>
+<body>
+
+<div id="tab-bar">
+  <button class="tab-btn" id="tab-viewer" onclick="switchTab('viewer')">Viewer</button>
+  <button class="tab-btn active" id="tab-text" onclick="switchTab('text')">Text</button>
+</div>
+
+<div id="toolbar">
+  <!-- Text toolbar -->
+  <span id="tb-text">
+    <button class="tool-btn" onclick="pasteClipboard()">Paste</button>
+    <button class="tool-btn" onclick="copyText()">Copy</button>
+    <span class="tool-sep">|</span>
+    <button class="tool-btn" onclick="formatJSON()">Format</button>
+    <button class="tool-btn" onclick="removeWhiteSpace()">Remove white space</button>
+    <span class="tool-sep">|</span>
+    <button class="tool-btn" onclick="clearText()">Clear</button>
+    <span class="tool-sep">|</span>
+    <button class="tool-btn" onclick="triggerFileLoad()">Load JSON data</button>
+    <input type="file" id="file-input" accept=".json,application/json,text/plain" style="display:none" onchange="loadFile(event)">
+  </span>
+  <!-- Viewer toolbar -->
+  <span id="tb-viewer" style="display:none">
+    <button class="tool-btn" onclick="expandAll()">Expand all</button>
+    <button class="tool-btn" onclick="collapseAll()">Collapse all</button>
+    <span class="tool-sep">|</span>
+    <button class="tool-btn" onclick="switchTab('text')">← Back to Text</button>
+  </span>
+</div>
+
+<div id="error-bar"></div>
+
+<div id="panel-text" class="active">
+  <textarea id="json-input" spellcheck="false" placeholder="Paste or type your JSON here…"></textarea>
+</div>
+
+<div id="panel-viewer">
+  <div id="viewer-container"></div>
+</div>
+
+<script>
+/* ─────────── Tab switching ─────────── */
+function switchTab(tab) {
+  document.getElementById('panel-text').classList.toggle('active', tab === 'text');
+  document.getElementById('panel-viewer').classList.toggle('active', tab === 'viewer');
+  document.getElementById('tab-text').classList.toggle('active', tab === 'text');
+  document.getElementById('tab-viewer').classList.toggle('active', tab === 'viewer');
+  document.getElementById('tb-text').style.display = tab === 'text' ? '' : 'none';
+  document.getElementById('tb-viewer').style.display = tab === 'viewer' ? '' : 'none';
+
+  if (tab === 'viewer') renderViewer();
+}
+
+/* ─────────── Text tab actions ─────────── */
+async function pasteClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    document.getElementById('json-input').value = text;
+  } catch(e) {
+    alert('Clipboard access denied. Please paste manually (Ctrl+V / Cmd+V).');
+  }
+}
+
+function copyText() {
+  const ta = document.getElementById('json-input');
+  ta.select();
+  navigator.clipboard.writeText(ta.value).catch(() => document.execCommand('copy'));
+}
+
+function formatJSON() {
+  const ta = document.getElementById('json-input');
+  try {
+    const parsed = JSON.parse(ta.value);
+    ta.value = JSON.stringify(parsed, null, 2);
+    hideError();
+  } catch(e) { showError(e.message); }
+}
+
+function removeWhiteSpace() {
+  const ta = document.getElementById('json-input');
+  try {
+    const parsed = JSON.parse(ta.value);
+    ta.value = JSON.stringify(parsed);
+    hideError();
+  } catch(e) { showError(e.message); }
+}
+
+function clearText() {
+  document.getElementById('json-input').value = '';
+  document.getElementById('viewer-container').innerHTML = '';
+  hideError();
+}
+
+function triggerFileLoad() { document.getElementById('file-input').click(); }
+
+function loadFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('json-input').value = e.target.result;
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+/* ─────────── Error bar ─────────── */
+function showError(msg) {
+  const bar = document.getElementById('error-bar');
+  bar.textContent = '⚠ ' + msg;
+  bar.style.display = 'block';
+}
+function hideError() {
+  document.getElementById('error-bar').style.display = 'none';
+}
+
+/* ─────────── Viewer renderer ─────────── */
+function renderViewer() {
+  const raw = document.getElementById('json-input').value.trim();
+  const container = document.getElementById('viewer-container');
+  container.innerHTML = '';
+  if (!raw) { container.textContent = 'No JSON to display.'; return; }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+    hideError();
+  } catch(e) {
+    showError(e.message);
+    container.textContent = 'Invalid JSON – fix errors in the Text tab first.';
+    return;
+  }
+  container.appendChild(buildNode(parsed, null, true));
+}
+
+let nodeIdCounter = 0;
+
+function buildNode(value, key, isRoot) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'tree-node';
+
+  if (value !== null && typeof value === 'object') {
+    const isArr = Array.isArray(value);
+    const entries = isArr ? value : Object.entries(value);
+    const count = isArr ? value.length : entries.length;
+    const openBrace = isArr ? '[' : '{';
+    const closeBrace = isArr ? ']' : '}';
+    const id = 'n' + (++nodeIdCounter);
+
+    const item = document.createElement('div');
+    item.className = 'tree-item';
+
+    // toggle button
+    const tog = document.createElement('span');
+    tog.className = 'toggle-btn';
+    tog.textContent = '▼';
+    tog.onclick = () => toggleNode(id, tog);
+    item.appendChild(tog);
+
+    // key (if any)
+    if (key !== null) {
+      const k = document.createElement('span');
+      k.className = 'key';
+      k.textContent = '"' + key + '"';
+      item.appendChild(k);
+      const col = document.createElement('span');
+      col.className = 'colon';
+      col.textContent = ': ';
+      item.appendChild(col);
+    }
+
+    // opening brace
+    const ob = document.createElement('span');
+    ob.className = 'brace';
+    ob.textContent = openBrace;
+    item.appendChild(ob);
+
+    // inline preview (shown when collapsed)
+    const preview = document.createElement('span');
+    preview.className = 'inline-preview';
+    preview.id = 'preview-' + id;
+    preview.style.display = 'none';
+    preview.textContent = count + (count === 1 ? ' item' : ' items') + ' …' + closeBrace;
+    item.appendChild(preview);
+
+    wrapper.appendChild(item);
+
+    // children container
+    const childrenDiv = document.createElement('div');
+    childrenDiv.className = 'tree-children';
+    childrenDiv.id = id;
+
+    if (isArr) {
+      value.forEach((v, i) => {
+        const child = buildNode(v, null, false);
+        // add comma
+        appendWithComma(childrenDiv, child, i < value.length - 1);
+      });
+    } else {
+      entries.forEach(([k, v], i) => {
+        const child = buildNode(v, k, false);
+        appendWithComma(childrenDiv, child, i < entries.length - 1);
+      });
+    }
+
+    wrapper.appendChild(childrenDiv);
+
+    // closing brace on own line
+    const closeRow = document.createElement('div');
+    closeRow.className = 'tree-item';
+    const cb = document.createElement('span');
+    cb.className = 'brace';
+    cb.style.paddingLeft = '14px';
+    cb.textContent = closeBrace;
+    closeRow.appendChild(cb);
+    wrapper.appendChild(closeRow);
+
+  } else {
+    // leaf node
+    const item = document.createElement('div');
+    item.className = 'tree-item';
+    item.style.paddingLeft = '14px';
+
+    if (key !== null) {
+      const k = document.createElement('span');
+      k.className = 'key';
+      k.textContent = '"' + key + '"';
+      item.appendChild(k);
+      const col = document.createElement('span');
+      col.className = 'colon';
+      col.textContent = ': ';
+      item.appendChild(col);
+    }
+
+    const val = document.createElement('span');
+    if (value === null) {
+      val.className = 'val-null';
+      val.textContent = 'null';
+    } else if (typeof value === 'boolean') {
+      val.className = 'val-bool';
+      val.textContent = String(value);
+    } else if (typeof value === 'number') {
+      val.className = 'val-number';
+      val.textContent = String(value);
+    } else {
+      val.className = 'val-string';
+      const display = value.length > 100 ? value.slice(0, 100) + '…' : value;
+      val.textContent = '"' + display + '"';
+      if (value.length > 100) val.title = value;
+    }
+    item.appendChild(val);
+    wrapper.appendChild(item);
+  }
+
+  return wrapper;
+}
+
+function appendWithComma(parent, child, hasComma) {
+  if (hasComma) {
+    // add comma to the last leaf-level item inside child
+    const items = child.querySelectorAll('.tree-item');
+    // We'll append a comma span to the outer wrapper instead
+    const commaSpan = document.createElement('span');
+    commaSpan.textContent = ',';
+    commaSpan.style.color = '#555';
+    // Attach to last visible item in child
+    const lastItem = child.lastElementChild;
+    if (lastItem) {
+      lastItem.appendChild(commaSpan);
+    }
+  }
+  parent.appendChild(child);
+}
+
+function toggleNode(id, btn) {
+  const children = document.getElementById(id);
+  const preview = document.getElementById('preview-' + id);
+  const isCollapsed = children.style.display === 'none';
+  children.style.display = isCollapsed ? '' : 'none';
+  if (preview) preview.style.display = isCollapsed ? 'none' : 'inline';
+  btn.textContent = isCollapsed ? '▼' : '▶';
+  btn.closest('.tree-node').classList.toggle('collapsed', !isCollapsed);
+}
+
+function expandAll() {
+  document.querySelectorAll('.tree-children').forEach(el => el.style.display = '');
+  document.querySelectorAll('.inline-preview').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.toggle-btn').forEach(btn => btn.textContent = '▼');
+}
+
+function collapseAll() {
+  document.querySelectorAll('#viewer-container > .tree-node .tree-children').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('#viewer-container > .tree-node .inline-preview').forEach(el => el.style.display = 'inline');
+  document.querySelectorAll('.toggle-btn').forEach(btn => btn.textContent = '▶');
+}
+</script>
+</body>
+</html>
